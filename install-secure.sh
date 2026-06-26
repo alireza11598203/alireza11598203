@@ -12,74 +12,74 @@ clear
 
 echo -e "${GREEN}"
 echo "╔════════════════════════════════════════════════════════════════════════════════════════╗"
-echo "║     SSH Management Panel - نصب خودکار (نسخه ایمن‌شده)                                  ║"
-echo "║              برای Ubuntu 22 LTS و بالاتر                                               ║"
-echo "║         با حفاظت مقابل فیلتر‌ها و تهدیدات امنیتی                                        ║"
+echo "║          SSH Management Panel - Automatic Secure Installation                         ║"
+echo "║                    For Ubuntu 22 LTS and Higher                                        ║"
+echo "║              With Protection Against Filters and Security Threats                      ║"
 echo "╚════════════════════════════════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
-# بررسی دسترسی root
+# Check root access
 if [ "$EUID" -ne 0 ]; then 
-    echo -e "${RED}❌ این اسکریپت باید با دسترسی root اجرا شود${NC}"
-    echo "دستور صحیح: sudo bash install.sh"
+    echo -e "${RED}[ERROR] This script must be run with root privileges${NC}"
+    echo "Correct command: sudo bash install-secure.sh"
     exit 1
 fi
 
-echo -e "${YELLOW}⏳ بررسی و نصب پکیج‌های مورد نیاز...${NC}\n"
+echo -e "${YELLOW}[*] Checking and installing required packages...${NC}\n"
 apt update -qq > /dev/null 2>&1
 apt install -y -qq python3-pip python3-venv git curl wget iptables-persistent netfilter-persistent ufw > /dev/null 2>&1
 
-echo -e "${GREEN}✅ پکیج‌ها نصب شدند${NC}\n"
+echo -e "${GREEN}[+] Packages installed successfully${NC}\n"
 
-# درخواست اطلاعات از کاربر
+# Request information from user
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}📝 لطفاً اطلاعات مورد نیاز را وارد کنید:${NC}"
+echo -e "${BLUE}[INFO] Please enter the required information:${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-# درخواست نام کاربری
+# Request admin username
 while true; do
-    read -p "👤 نام کاربری مدیر (Admin Username): " ADMIN_USER
+    read -p "[?] Admin Username: " ADMIN_USER
     if [ -z "$ADMIN_USER" ]; then
-        echo -e "${RED}❌ نام کاربری نمی‌تواند خالی باشد${NC}"
+        echo -e "${RED}[ERROR] Username cannot be empty${NC}"
         continue
     fi
     break
 done
 
-# درخواست رمز عبور
+# Request admin password
 while true; do
-    read -sp "🔐 رمز عبور مدیر (Admin Password): " ADMIN_PASS
+    read -sp "[?] Admin Password: " ADMIN_PASS
     echo ""
     if [ -z "$ADMIN_PASS" ]; then
-        echo -e "${RED}❌ رمز عبور نمی‌تواند خالی باشد${NC}"
+        echo -e "${RED}[ERROR] Password cannot be empty${NC}"
         continue
     fi
     break
 done
 
-# درخواست پورت
+# Request port
 while true; do
-    read -p "🔌 پورت پنل (Port) [پیش‌فرض: 5000]: " PANEL_PORT
+    read -p "[?] Panel Port [default: 5000]: " PANEL_PORT
     PANEL_PORT=${PANEL_PORT:-5000}
     if ! [[ "$PANEL_PORT" =~ ^[0-9]+$ ]] || [ "$PANEL_PORT" -lt 1 ] || [ "$PANEL_PORT" -gt 65535 ]; then
-        echo -e "${RED}❌ پورت باید عدد بین 1 تا 65535 باشد${NC}"
+        echo -e "${RED}[ERROR] Port must be a number between 1 and 65535${NC}"
         continue
     fi
     break
 done
 
-# درخواست استفاده از دومین DuoProxy
+# Request DuoProxy domain
 echo ""
-echo -e "${YELLOW}🌐 آیا می‌خواهید از دومین DuoProxy استفاده کنید؟${NC}"
-read -p "آیا دومین DuoProxy دارید؟ (y/n) [پیش‌فرض: n]: " USE_DUOPROXY
+echo -e "${YELLOW}[?] Do you want to use DuoProxy domain?${NC}"
+read -p "Do you have a DuoProxy domain? (y/n) [default: n]: " USE_DUOPROXY
 USE_DUOPROXY=${USE_DUOPROXY:-n}
 
 if [[ "$USE_DUOPROXY" == "y" || "$USE_DUOPROXY" == "Y" ]]; then
-    echo -e "${YELLOW}💡 مثال: panel.yourdomain.com یا ssh-panel.yourdomain.com${NC}"
-    read -p "🔗 دومین/ساب‌دومین DuoProxy را وارد کنید: " DUOPROXY_DOMAIN
+    echo -e "${YELLOW}[INFO] Example: panel.yourdomain.com or ssh-panel.yourdomain.com${NC}"
+    read -p "[?] Enter DuoProxy domain/subdomain: " DUOPROXY_DOMAIN
     
     if [ -z "$DUOPROXY_DOMAIN" ]; then
-        echo -e "${RED}❌ دومین نمی‌تواند خالی باشد${NC}"
+        echo -e "${RED}[ERROR] Domain cannot be empty${NC}"
         DUOPROXY_DOMAIN=""
         USE_DUOPROXY="n"
     else
@@ -87,28 +87,28 @@ if [[ "$USE_DUOPROXY" == "y" || "$USE_DUOPROXY" == "Y" ]]; then
         PANEL_HOST="127.0.0.1"
     fi
 else
-    # درخواست آدرس IP/Hostname
+    # Request IP/Hostname
     echo ""
-    echo -e "${YELLOW}ℹ️ برای امنیت بیشتر، فقط localhost توصیه می‌شود${NC}"
-    read -p "🌐 آدرس IP/Hostname [پیش‌فرض: 127.0.0.1]: " PANEL_HOST
+    echo -e "${YELLOW}[INFO] For better security, only localhost is recommended${NC}"
+    read -p "[?] IP Address/Hostname [default: 127.0.0.1]: " PANEL_HOST
     PANEL_HOST=${PANEL_HOST:-127.0.0.1}
 
-    # دریافت آدرس IP واقعی
+    # Get real IP address
     REAL_IP=$(hostname -I | awk '{print $1}')
     if [ "$PANEL_HOST" = "127.0.0.1" ]; then
         ACCESS_URL="http://127.0.0.1:$PANEL_PORT"
-        echo -e "${YELLOW}💡 برای دسترسی از دور: ssh -L 5000:127.0.0.1:$PANEL_PORT user@$REAL_IP${NC}"
+        echo -e "${YELLOW}[INFO] To access remotely: ssh -L 5000:127.0.0.1:$PANEL_PORT user@$REAL_IP${NC}"
     else
         ACCESS_URL="http://$PANEL_HOST:$PANEL_PORT"
     fi
 fi
 
 echo ""
-echo -e "${YELLOW}📁 انتخاب مسیر نصب:${NC}"
-echo "  1) /opt/ssh-panel (پیش‌فرض - توصیه شده)"
+echo -e "${YELLOW}[?] Select installation path:${NC}"
+echo "  1) /opt/ssh-panel (default - recommended)"
 echo "  2) /home/ssh-panel"
-echo "  3) مسیر سفارشی"
-read -p "انتخاب کنید (1-3) [پیش‌فرض: 1]: " INSTALL_CHOICE
+echo "  3) Custom path"
+read -p "[?] Choose (1-3) [default: 1]: " INSTALL_CHOICE
 INSTALL_CHOICE=${INSTALL_CHOICE:-1}
 
 case $INSTALL_CHOICE in
@@ -119,7 +119,7 @@ case $INSTALL_CHOICE in
         INSTALL_PATH="/home/ssh-panel"
         ;;
     3)
-        read -p "مسیر سفارشی را وارد کنید: " INSTALL_PATH
+        read -p "[?] Enter custom path: " INSTALL_PATH
         ;;
     *)
         INSTALL_PATH="/opt/ssh-panel"
@@ -127,40 +127,40 @@ case $INSTALL_CHOICE in
 esac
 
 echo ""
-echo -e "${CYAN}🛡️ تنظیمات امنیتی:${NC}"
+echo -e "${CYAN}[SECURITY] Security settings:${NC}"
 echo ""
-read -p "آیا می‌خواهید تنظیمات firewall را اعمال کنم؟ (y/n) [پیش‌فرض: y]: " SETUP_FIREWALL
+read -p "[?] Apply firewall configuration? (y/n) [default: y]: " SETUP_FIREWALL
 SETUP_FIREWALL=${SETUP_FIREWALL:-y}
 
-read -p "آیا می‌خواهید MTU Fragmentation را فعال کنم؟ (y/n) [پیش‌فرض: y]: " SETUP_MTU
+read -p "[?] Enable MTU Fragmentation? (y/n) [default: y]: " SETUP_MTU
 SETUP_MTU=${SETUP_MTU:-y}
 
-read -p "آیا می‌خواهید Obfuscation را فعال کنم؟ (y/n) [پیش‌فرض: y]: " SETUP_OBFS
+read -p "[?] Enable Obfuscation? (y/n) [default: y]: " SETUP_OBFS
 SETUP_OBFS=${SETUP_OBFS:-y}
 
 echo ""
-echo -e "${YELLOW}⏳ نصب پنل در $INSTALL_PATH...${NC}\n"
+echo -e "${YELLOW}[*] Installing panel at $INSTALL_PATH...${NC}\n"
 
-# ایجاد دایرکتوری
+# Create directory
 mkdir -p "$INSTALL_PATH"
 cd "$INSTALL_PATH"
 
-# دانلود فایل‌ها
-echo -e "${YELLOW}📥 دانلود فایل‌های پروژه...${NC}"
+# Download files
+echo -e "${YELLOW}[*] Downloading project files...${NC}"
 git clone https://github.com/alireza11598203/alireza11598203.git . 2>/dev/null || git pull origin main > /dev/null 2>&1
 
-# ایجاد virtual environment
-echo -e "${YELLOW}🐍 ایجاد Python virtual environment...${NC}"
+# Create virtual environment
+echo -e "${YELLOW}[*] Creating Python virtual environment...${NC}"
 python3 -m venv venv
 source venv/bin/activate
 
-# نصب dependencies
-echo -e "${YELLOW}📦 نصب Python packages...${NC}"
+# Install dependencies
+echo -e "${YELLOW}[*] Installing Python packages...${NC}"
 pip install -q --upgrade pip setuptools wheel > /dev/null 2>&1
 pip install -q -r requirements.txt > /dev/null 2>&1
 
-# ایجاد فایل کنفیگ
-echo -e "${YELLOW}⚙️ ایجاد فایل تنظیمات...${NC}"
+# Create config file
+echo -e "${YELLOW}[*] Creating configuration file...${NC}"
 
 cat > "$INSTALL_PATH/.env" << EOF
 FLASK_ENV=production
@@ -180,7 +180,7 @@ if [[ "$USE_DUOPROXY" == "y" || "$USE_DUOPROXY" == "Y" ]]; then
     echo "DUOPROXY_DOMAIN=$DUOPROXY_DOMAIN" >> "$INSTALL_PATH/.env"
 fi
 
-# ایجاد اسکریپت راه‌اندازی
+# Create launch script
 cat > "$INSTALL_PATH/run.sh" << 'RUNSCRIPT'
 #!/bin/bash
 source $(dirname "$0")/venv/bin/activate
@@ -189,8 +189,8 @@ python3 app.py
 RUNSCRIPT
 chmod +x "$INSTALL_PATH/run.sh"
 
-# ایجاد سرویس systemd
-echo -e "${YELLOW}🔧 ایجاد سرویس systemd...${NC}"
+# Create systemd service
+echo -e "${YELLOW}[*] Creating systemd service...${NC}"
 
 cat > /etc/systemd/system/ssh-panel.service << EOF
 [Unit]
@@ -215,23 +215,23 @@ LimitNOFILE=65536
 WantedBy=multi-user.target
 EOF
 
-# تغییر مالکیت
+# Change ownership
 chown -R root:root "$INSTALL_PATH"
 chmod 750 "$INSTALL_PATH"
 
-# اعمال تنظیمات امنیتی
-echo -e "${YELLOW}🛡️ اعمال تنظیمات امنیتی...${NC}"
+# Apply security settings
+echo -e "${YELLOW}[*] Applying security settings...${NC}"
 
 # 1. MTU Fragmentation
 if [[ "$SETUP_MTU" == "y" || "$SETUP_MTU" == "Y" ]]; then
-    echo -e "${CYAN}📦 تنظیم MTU Fragmentation...${NC}"
+    echo -e "${CYAN}[SECURITY] Setting MTU Fragmentation...${NC}"
     
-    # تغییر MTU برای جلوگیری از تشخیص DPI
+    # Change MTU to prevent DPI detection
     INTERFACE=$(ip route | grep default | awk '{print $5}' | head -1)
     if [ ! -z "$INTERFACE" ]; then
         ip link set dev $INTERFACE mtu 1400
         
-        # ذخیره تغییرات برای بوت بعدی
+        # Save changes for next boot
         cat >> /etc/network/interfaces.d/99-ssh-panel << MTUCONF
 auto $INTERFACE
 iface $INTERFACE inet dhcp
@@ -242,41 +242,41 @@ fi
 
 # 2. UFW Firewall Configuration
 if [[ "$SETUP_FIREWALL" == "y" || "$SETUP_FIREWALL" == "Y" ]]; then
-    echo -e "${CYAN}🔥 تنظیم Firewall...${NC}"
+    echo -e "${CYAN}[SECURITY] Configuring Firewall...${NC}"
     
-    # فعال‌سازی UFW
+    # Enable UFW
     ufw --force enable > /dev/null 2>&1
     
-    # حذف تمام قوانین قدیم
+    # Reset old rules
     ufw reset --force > /dev/null 2>&1
     ufw --force enable > /dev/null 2>&1
     
-    # قوانین پایه
+    # Default rules
     ufw default deny incoming > /dev/null 2>&1
     ufw default allow outgoing > /dev/null 2>&1
     
-    # SSH (اضطراری)
+    # SSH (emergency access)
     ufw allow 22/tcp > /dev/null 2>&1
     
     # SSH Panel
     ufw allow $PANEL_PORT/tcp > /dev/null 2>&1
     
-    # HTTP/HTTPS (فقط اگر DuoProxy نیست)
+    # HTTP/HTTPS (only if not DuoProxy)
     if [[ "$USE_DUOPROXY" != "y" && "$USE_DUOPROXY" != "Y" ]]; then
         ufw allow 80/tcp > /dev/null 2>&1
         ufw allow 443/tcp > /dev/null 2>&1
     fi
     
-    # DNS (مهم برای امنیت)
+    # DNS (important for security)
     ufw allow 53/tcp > /dev/null 2>&1
     ufw allow 53/udp > /dev/null 2>&1
 fi
 
-# 3. Obfuscation و جلوگیری از تشخیص
+# 3. Obfuscation and DPI Avoidance
 if [[ "$SETUP_OBFS" == "y" || "$SETUP_OBFS" == "Y" ]]; then
-    echo -e "${CYAN}🎭 تنظیم Obfuscation...${NC}"
+    echo -e "${CYAN}[SECURITY] Setting up Obfuscation...${NC}"
     
-    # ایجاد فایل sysctl برای بهینه‌سازی
+    # Create sysctl file for optimization
     cat > /etc/sysctl.d/99-ssh-panel-security.conf << SYSCTLCONF
 # SSH Panel Security Configuration
 net.ipv4.conf.all.rp_filter = 1
@@ -291,7 +291,7 @@ net.ipv4.conf.default.log_martians = 1
 net.ipv6.conf.all.disable_ipv6 = 0
 net.ipv6.conf.all.forwarding = 0
 
-# بهینه‌سازی TCP برای کاهش تشخیص DPI
+# TCP optimization to reduce DPI detection
 net.ipv4.tcp_timestamps = 1
 net.ipv4.tcp_window_scaling = 1
 net.core.rmem_max = 134217728
@@ -300,156 +300,123 @@ net.ipv4.tcp_rmem = 4096 87380 67108864
 net.ipv4.tcp_wmem = 4096 65536 67108864
 SYSCTLCONF
     
-    # اعمال تغییرات
+    # Apply changes
     sysctl -p /etc/sysctl.d/99-ssh-panel-security.conf > /dev/null 2>&1
 fi
 
-# 4. حفاظت از اپلیکیشن‌های ایرانی
-echo -e "${CYAN}🇮🇷 حفاظت از اپلیکیشن‌های ایرانی...${NC}"
+# 4. Protection script
+echo -e "${CYAN}[SECURITY] Creating protection script...${NC}"
 
-# لیست سایت‌های و IP‌های ایرانی که باید نوتریفاید شوند
-cat > /etc/security/iran-apps-protection.conf << IRANCFG
-# سایت‌های ایرانی محبوب (محافظت شده)
-# این سایت‌ها از طریق VPN/Proxy مجاز نیستند
-
-BLOCKED_DOMAINS="
-    instagram.com
-    telegram.org
-    whatsapp.com
-    facebook.com
-    twitter.com
-    youtube.com
-    discord.com
-    twitch.tv
-    reddit.com
-    pinterest.com
-"
-
-# این سایت‌ها تحت تاثیر فیلتر هستند و با احتیاط استفاده شوند
-FILTERED_DOMAINS="
-    wikipedia.org
-    news.ycombinator.com
-    medium.com
-    github.com
-"
-IRANCFG
-
-chmod 600 /etc/security/iran-apps-protection.conf
-
-# 5. ایجاد اسکریپت حفاظت برای شبکه
 cat > /usr/local/bin/ssh-panel-protect.sh << 'PROTECTSCRIPT'
 #!/bin/bash
 
-# تنظیم‌های حفاظتی اضافی
+# Additional protection settings
 echo "[$(date)] SSH Panel Protection Starting..." >> /var/log/ssh-panel-protect.log
 
-# تفعیل IP masquerading برای جلوگیری از تشخیص مستقیم
+# Enable IP masquerading to prevent direct identification
 iptables -t nat -A POSTROUTING -j MASQUERADE 2>/dev/null
 
-# ذخیره تغییرات
+# Save changes
 netfilter-persistent save > /dev/null 2>&1
-
-# تغییر TCP ISN برای جلوگیری از شناسایی الگو
-ip link set dev lo noxfrm
 
 echo "[$(date)] Protection applied successfully" >> /var/log/ssh-panel-protect.log
 PROTECTSCRIPT
 
 chmod +x /usr/local/bin/ssh-panel-protect.sh
 
-# اجرای اسکریپت حفاظت
+# Run protection script
 /usr/local/bin/ssh-panel-protect.sh
 
-# فعال‌سازی سرویس
-echo -e "${YELLOW}🚀 فعال‌سازی سرویس...${NC}"
+# Enable service
+echo -e "${YELLOW}[*] Enabling service...${NC}"
 systemctl daemon-reload
 systemctl enable ssh-panel > /dev/null 2>&1
 systemctl restart ssh-panel
 
-# ایجاد cron job برای حفاظت مستمر
+# Create cron job for continuous protection
 (crontab -l 2>/dev/null | grep -v ssh-panel-protect.sh; echo "*/5 * * * * /usr/local/bin/ssh-panel-protect.sh") | crontab -
 
 echo ""
 echo -e "${GREEN}"
 echo "╔════════════════════════════════════════════════════════════════════════════════════════╗"
-echo "║              ✅ نصب و تنظیمات امنیتی با موفقیت انجام شد!                               ║"
+echo "║              [SUCCESS] Installation and security settings completed!                   ║"
 echo "╚════════════════════════════════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
 echo ""
-echo -e "${BLUE}📋 اطلاعات دسترسی:${NC}"
+echo -e "${BLUE}[ACCESS INFORMATION]${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}🌐 آدرس پنل:${NC}        $ACCESS_URL"
-echo -e "${GREEN}👤 نام کاربری:${NC}      $ADMIN_USER"
-echo -e "${GREEN}🔐 رمز عبور:${NC}       $ADMIN_PASS"
-echo -e "${GREEN}🔌 پورت:${NC}           $PANEL_PORT"
-echo -e "${GREEN}📁 مسیر نصب:${NC}       $INSTALL_PATH"
+echo -e "${GREEN}[+] Panel URL:${NC}        $ACCESS_URL"
+echo -e "${GREEN}[+] Username:${NC}        $ADMIN_USER"
+echo -e "${GREEN}[+] Password:${NC}        $ADMIN_PASS"
+echo -e "${GREEN}[+] Port:${NC}            $PANEL_PORT"
+echo -e "${GREEN}[+] Install Path:${NC}    $INSTALL_PATH"
 
 if [[ "$USE_DUOPROXY" == "y" || "$USE_DUOPROXY" == "Y" ]]; then
-    echo -e "${GREEN}🔗 دومین DuoProxy:${NC}   $DUOPROXY_DOMAIN"
-    echo -e "${YELLOW}💡 نکته: پنل فقط روی localhost در حال اجرا است. از DuoProxy برای دسترسی استفاده کنید.${NC}"
+    echo -e "${GREEN}[+] DuoProxy Domain:${NC}  $DUOPROXY_DOMAIN"
+    echo -e "${YELLOW}[INFO] Note: Panel runs only on localhost. Use DuoProxy for access.${NC}"
 fi
 
 echo ""
-echo -e "${CYAN}🛡️ تنظیمات امنیتی فعال‌شده:${NC}"
+echo -e "${CYAN}[SECURITY] Enabled security features:${NC}"
 if [[ "$SETUP_MTU" == "y" || "$SETUP_MTU" == "Y" ]]; then
-    echo -e "   ${GREEN}✅ MTU Fragmentation${NC}"
+    echo -e "   ${GREEN}[+] MTU Fragmentation${NC}"
 fi
 if [[ "$SETUP_FIREWALL" == "y" || "$SETUP_FIREWALL" == "Y" ]]; then
-    echo -e "   ${GREEN}✅ UFW Firewall${NC}"
+    echo -e "   ${GREEN}[+] UFW Firewall${NC}"
 fi
 if [[ "$SETUP_OBFS" == "y" || "$SETUP_OBFS" == "Y" ]]; then
-    echo -e "   ${GREEN}✅ Obfuscation & Protection${NC}"
+    echo -e "   ${GREEN}[+] Obfuscation & Protection${NC}"
 fi
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 echo ""
-echo -e "${YELLOW}⏳ در حال بارگذاری... (چند لحظه منتظر بمانید)${NC}"
+echo -e "${YELLOW}[*] Service is starting... (please wait)${NC}"
 sleep 3
 
-# بررسی وضعیت سرویس
+# Check service status
 if systemctl is-active --quiet ssh-panel; then
-    echo -e "${GREEN}✅ سرویس با موفقیت راه‌اندازی شد!${NC}"
+    echo -e "${GREEN}[+] Service started successfully!${NC}"
     echo ""
-    echo -e "${GREEN}🎉 نصب کامل و ایمن‌شده شد!${NC}"
-    echo -e "${YELLOW}حالا می‌توانید به پنل وارد شوید:${NC}"
+    echo -e "${GREEN}[SUCCESS] Installation complete and secure!${NC}"
+    echo -e "${YELLOW}[INFO] You can now access the panel at:${NC}"
     echo ""
-    echo -e "${BLUE}➜  $ACCESS_URL${NC}"
+    echo -e "${BLUE}==> $ACCESS_URL${NC}"
     echo ""
 else
-    echo -e "${RED}⚠️ مشکلی در راه‌اندازی سرویس وجود دارد${NC}"
-    echo "برای دیدن لاگ‌ها دستور زیر را اجرا کنید:"
+    echo -e "${RED}[ERROR] Problem starting the service${NC}"
+    echo "[INFO] To see logs, run:"
     echo "sudo journalctl -u ssh-panel -n 50"
 fi
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}🚀 دستورات مفید:${NC}"
+echo -e "${YELLOW}[USEFUL COMMANDS]${NC}"
 echo ""
-echo "📋 دستورات سرویس:"
-echo -e "   ${BLUE}• مشاهده لاگ:${NC}              sudo journalctl -u ssh-panel -f"
-echo -e "   ${BLUE}• شروع مجدد:${NC}              sudo systemctl restart ssh-panel"
-echo -e "   ${BLUE}• توقف سرویس:${NC}             sudo systemctl stop ssh-panel"
-echo -e "   ${BLUE}• وضعیت سرویس:${NC}            sudo systemctl status ssh-panel"
+echo "[SERVICE COMMANDS]"
+echo -e "   ${BLUE}• View logs:${NC}              sudo journalctl -u ssh-panel -f"
+echo -e "   ${BLUE}• Restart service:${NC}         sudo systemctl restart ssh-panel"
+echo -e "   ${BLUE}• Stop service:${NC}            sudo systemctl stop ssh-panel"
+echo -e "   ${BLUE}• Check status:${NC}            sudo systemctl status ssh-panel"
 echo ""
-echo "🔒 دستورات امنیتی:"
-echo -e "   ${BLUE}• وضعیت Firewall:${NC}         sudo ufw status"
-echo -e "   ${BLUE}• مشاهده قوانین iptables:${NC}   sudo iptables -L -n"
-echo -e "   ${BLUE}• بررسی حفاظت:${NC}            sudo cat /var/log/ssh-panel-protect.log"
+echo "[SECURITY COMMANDS]"
+echo -e "   ${BLUE}• Firewall status:${NC}         sudo ufw status"
+echo -e "   ${BLUE}• View iptables:${NC}           sudo iptables -L -n"
+echo -e "   ${BLUE}• Check protection:${NC}        sudo cat /var/log/ssh-panel-protect.log"
 echo ""
-echo "📂 فایل‌های اصلی:"
-echo -e "   ${BLUE}• مسیر نصب:${NC}               $INSTALL_PATH"
-echo -e "   ${BLUE}• فایل .env:${NC}              $INSTALL_PATH/.env"
-echo -e "   ${BLUE}• دیتابیس:${NC}                $INSTALL_PATH/ssh_panel.db"
-echo -e "   ${BLUE}• لاگ حفاظت:${NC}              /var/log/ssh-panel-protect.log"
+echo "[IMPORTANT FILES]"
+echo -e "   ${BLUE}• Install path:${NC}            $INSTALL_PATH"
+echo -e "   ${BLUE}• Config file:${NC}             $INSTALL_PATH/.env"
+echo -e "   ${BLUE}• Database:${NC}                $INSTALL_PATH/ssh_panel.db"
+echo -e "   ${BLUE}• Protection log:${NC}          /var/log/ssh-panel-protect.log"
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "${CYAN}💡 نکات امنیتی:${NC}"
-echo "   • استفاده از DuoProxy برای مخفی‌کاری IP واقعی"
-echo "   • تغییر پورت پیش‌فرض SSH"
-echo "   • استفاده از کلیدهای SSH به جای رمز"
-echo "   • فعال‌کردن 2FA برای اکانت‌ها"
-echo "   • بروزرسانی منظم سیستم"
+echo -e "${CYAN}[SECURITY TIPS]${NC}"
+echo "   • Use DuoProxy to hide real IP"
+echo "   • Change default SSH port"
+echo "   • Use SSH keys instead of passwords"
+echo "   • Enable 2FA for accounts"
+echo "   • Keep system updated regularly"
 echo ""

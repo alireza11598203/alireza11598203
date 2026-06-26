@@ -10,10 +10,10 @@ NC='\033[0m'
 clear
 
 echo -e "${GREEN}"
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║        SSH Management Panel - نصاب خودکار              ║"
-echo "║              برای Ubuntu 22 LTS و بالاتر                   ║"
-echo "╚══════════════════════════════════════════════════════════════╝"
+echo "╔════════════════════════════════════════════════════════════════════════════════════════╗"
+echo "║        SSH Management Panel - نصب خودکار                                              ║"
+echo "║              برای Ubuntu 22 LTS و بالاتر                                               ║"
+echo "╚════════════════════════════════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
 # بررسی دسترسی root
@@ -30,9 +30,9 @@ apt install -y -qq python3-pip python3-venv git curl wget > /dev/null 2>&1
 echo -e "${GREEN}✅ پکیج‌ها نصب شدند${NC}\n"
 
 # درخواست اطلاعات از کاربر
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}📝 لطفاً اطلاعات مورد نیاز را وارد کنید:${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
 # درخواست نام کاربری
 while true; do
@@ -66,22 +66,41 @@ while true; do
     break
 done
 
-# درخواست آدرس
+# درخواست استفاده از دومین DuoProxy
 echo ""
-echo -e "${YELLOW}ℹ️ برای دسترسی از تمام رابط‌ها (0.0.0.0) یا فقط localhost انتخاب کنید${NC}"
-read -p "🌐 آدرس IP/Hostname [پیش‌فرض: 0.0.0.0]: " PANEL_HOST
-PANEL_HOST=${PANEL_HOST:-0.0.0.0}
+echo -e "${YELLOW}🌐 آیا می‌خواهید از دومین DuoProxy استفاده کنید؟${NC}"
+read -p "آیا دومین DuoProxy دارید؟ (y/n) [پیش‌فرض: n]: " USE_DUOPROXY
+USE_DUOPROXY=${USE_DUOPROXY:-n}
 
-echo ""
-
-# دریافت آدرس IP واقعی
-REAL_IP=$(hostname -I | awk '{print $1}')
-if [ "$PANEL_HOST" = "0.0.0.0" ]; then
-    ACCESS_URL="http://$REAL_IP:$PANEL_PORT"
+if [[ "$USE_DUOPROXY" == "y" || "$USE_DUOPROXY" == "Y" ]]; then
+    echo -e "${YELLOW}💡 مثال: panel.yourdomain.com یا ssh-panel.yourdomain.com${NC}"
+    read -p "🔗 دومین/ساب‌دومین DuoProxy را وارد کنید: " DUOPROXY_DOMAIN
+    
+    if [ -z "$DUOPROXY_DOMAIN" ]; then
+        echo -e "${RED}❌ دومین نمی‌تواند خالی باشد${NC}"
+        DUOPROXY_DOMAIN=""
+        USE_DUOPROXY="n"
+    else
+        ACCESS_URL="https://$DUOPROXY_DOMAIN"
+        PANEL_HOST="127.0.0.1"
+    fi
 else
-    ACCESS_URL="http://$PANEL_HOST:$PANEL_PORT"
+    # درخواست آدرس IP/Hostname
+    echo ""
+    echo -e "${YELLOW}ℹ️ برای دسترسی از تمام رابط‌ها (0.0.0.0) یا فقط localhost انتخاب کنید${NC}"
+    read -p "🌐 آدرس IP/Hostname [پیش‌فرض: 0.0.0.0]: " PANEL_HOST
+    PANEL_HOST=${PANEL_HOST:-0.0.0.0}
+
+    # دریافت آدرس IP واقعی
+    REAL_IP=$(hostname -I | awk '{print $1}')
+    if [ "$PANEL_HOST" = "0.0.0.0" ]; then
+        ACCESS_URL="http://$REAL_IP:$PANEL_PORT"
+    else
+        ACCESS_URL="http://$PANEL_HOST:$PANEL_PORT"
+    fi
 fi
 
+echo ""
 echo -e "${YELLOW}📁 انتخاب مسیر نصب:${NC}"
 echo "  1) /opt/ssh-panel (پیش‌فرض - توصیه شده)"
 echo "  2) /home/ssh-panel"
@@ -135,15 +154,21 @@ SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
 DATABASE_URL=sqlite:///ssh_panel.db
 ADMIN_USER=$ADMIN_USER
 ADMIN_PASS=$ADMIN_PASS
+PANEL_PORT=$PANEL_PORT
+FLASK_HOST=$PANEL_HOST
 EOF
 
-# ایجاد اسکریپت راه‌انداز
-cat > "$INSTALL_PATH/run.sh" << 'EOF'
+if [[ "$USE_DUOPROXY" == "y" || "$USE_DUOPROXY" == "Y" ]]; then
+    echo "DUOPROXY_DOMAIN=$DUOPROXY_DOMAIN" >> "$INSTALL_PATH/.env"
+fi
+
+# ایجاد اسکریپت راه‌اندازی
+cat > "$INSTALL_PATH/run.sh" << 'RUNSCRIPT'
 #!/bin/bash
 source $(dirname "$0")/venv/bin/activate
 cd $(dirname "$0")
 python3 app.py
-EOF
+RUNSCRIPT
 chmod +x "$INSTALL_PATH/run.sh"
 
 # ایجاد سرویس systemd
@@ -182,29 +207,27 @@ systemctl restart ssh-panel
 
 echo ""
 echo -e "${GREEN}"
-echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║              ✅ نصب با موفقیت انجام شد!                    ║"
-echo "╚══════════════════════════════════════════════════════════════╝"
+echo "╔════════════════════════════════════════════════════════════════════════════════════════╗"
+echo "║              ✅ نصب با موفقیت انجام شد!                                                ║"
+echo "╚════════════════════════════════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
 echo ""
 echo -e "${BLUE}📋 اطلاعات دسترسی:${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}🌐 آدرس پنل:${NC}        $ACCESS_URL"
 echo -e "${GREEN}👤 نام کاربری:${NC}      $ADMIN_USER"
 echo -e "${GREEN}🔐 رمز عبور:${NC}       $ADMIN_PASS"
 echo -e "${GREEN}🔌 پورت:${NC}           $PANEL_PORT"
 echo -e "${GREEN}📁 مسیر نصب:${NC}       $INSTALL_PATH"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-echo ""
-echo -e "${YELLOW}🚀 راهنمای سریع:${NC}"
-echo ""
-echo "📌 دستورات مفید:"
-echo -e "   ${BLUE}• مشاهده لاگ:${NC}              sudo journalctl -u ssh-panel -f"
-echo -e "   ${BLUE}• شروع مجدد:${NC}              sudo systemctl restart ssh-panel"
-echo -e "   ${BLUE}• توقف سرویس:${NC}             sudo systemctl stop ssh-panel"
-echo -e "   ${BLUE}• وضعیت سرویس:${NC}            sudo systemctl status ssh-panel"
+if [[ "$USE_DUOPROXY" == "y" || "$USE_DUOPROXY" == "Y" ]]; then
+    echo -e "${GREEN}🔗 دومین DuoProxy:${NC}   $DUOPROXY_DOMAIN"
+    echo -e "${YELLOW}💡 نکته: پنل فقط روی localhost در حال اجرا است. از DuoProxy برای دسترسی استفاده کنید.${NC}"
+fi
+
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
 echo ""
 echo -e "${YELLOW}⏳ در حال بارگذاری... (چند لحظه منتظر بمانید)${NC}"
 sleep 3
@@ -225,4 +248,18 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}🚀 دستورات مفید:${NC}"
+echo ""
+echo "📋 دستورات سرویس:"
+echo -e "   ${BLUE}• مشاهده لاگ:${NC}              sudo journalctl -u ssh-panel -f"
+echo -e "   ${BLUE}• شروع مجدد:${NC}              sudo systemctl restart ssh-panel"
+echo -e "   ${BLUE}• توقف سرویس:${NC}             sudo systemctl stop ssh-panel"
+echo -e "   ${BLUE}• وضعیت سرویس:${NC}            sudo systemctl status ssh-panel"
+echo ""
+echo "📂 فایل‌های اصلی:"
+echo -e "   ${BLUE}• مسیر نصب:${NC}               $INSTALL_PATH"
+echo -e "   ${BLUE}• فایل .env:${NC}              $INSTALL_PATH/.env"
+echo -e "   ${BLUE}• دیتابیس:${NC}                $INSTALL_PATH/ssh_panel.db"
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
